@@ -1,10 +1,10 @@
 [Unit]
-Description=Run Mail Fetcher every 5 minutes
+Description=Run Mailfetcher every 5 minutes
 
 [Timer]
-OnBootSec=30s
+OnBootSec=60
 OnUnitActiveSec=5min
+Persistent=true
 
 [Install]
 WantedBy=timers.target
-``
