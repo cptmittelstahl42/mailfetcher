@@ -69,10 +69,11 @@ mailfetcher/
 
 ```
 
-Installation
-Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter /opt/mailfetcher ein, erstellt eine virtuelle Python-Umgebung (venv), installiert Abhängigkeiten und richtet die Systemd-Dienste ein.
+## Installation
 
-Führe als root im geklonten Repository folgenden Befehl aus:
+Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter `/opt/mailfetcher` ein, erstellt eine virtuelle Python-Umgebung (venv), installiert Abhängigkeiten und richtet die Systemd-Dienste ein.
+
+Führe als `root` im geklonten Repository folgenden Befehl aus:
 
 Bash
 chmod +x install.sh
