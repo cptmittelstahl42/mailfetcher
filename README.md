@@ -35,24 +35,40 @@ Anstatt eine E-Mail direkt vom POP3-Server an den Exchange-Server durchzureichen
                                                                                       [ failed ] ──> (Admin-Alert)
 ```
 
-queue/pending (Wartend): E-Mails werden per POP3 heruntergeladen, mit einem eindeutigen SHA256-Hash als Dateinamen (.eml) versehen und hier gespeichert. Falls konfiguriert, werden sie direkt danach auf dem POP3-Server gelöscht.
+* **`queue/pending` (Wartend):** E-Mails werden per POP3 heruntergeladen, mit einem eindeutigen SHA256-Hash als Dateinamen (`.eml`) versehen und hier gespeichert. Falls konfiguriert, werden sie direkt danach auf dem POP3-Server gelöscht.
+* **`queue/processing` (In Bearbeitung):** Vor dem Senden wird die Mail in diesen Ordner verschoben. Sollte das Skript während des Sendevorgangs abstürzen, bleibt die Datei hier greifbar.
+* **`queue/delivered` (Zugestellt):** Nach erfolgreicher Zustellung via SMTP an den Exchange-Server wandert die Mail hierhin. Ein automatischer Aufräumprozess löscht Dateien in diesem Ordner nach 30 Tagen.
+* **`queue/failed` (Fehlgeschlagen):** Schlägt die Zustellung fehl, erhält die Datei ein Retry-Suffix (z. B. `.retry1`). Sie wandert zurück nach `pending` und wird beim nächsten Durchlauf erneut versucht. Erst wenn das Limit `max_retries` erreicht ist, wandert sie nach `failed` und eine Warnmeldung wird per E-Mail an den Admin gesendet.
 
-queue/processing (In Bearbeitung): Vor dem Senden wird die Mail in diesen Ordner verschoben. Sollte das Skript während des Sendevorgangs abstürzen, bleibt die Datei hier greifbar.
+---
 
-queue/delivered (Zugestellt): Nach erfolgreicher Zustellung via SMTP an den Exchange-Server wandert die Mail hierhin. Ein automatischer Aufräumprozess löscht Dateien in diesem Ordner nach 30 Tagen.
+## Features & Schutzmechanismen
 
-queue/failed (Fehlgeschlagen): Schlägt die Zustellung fehl, erhält die Datei ein Retry-Suffix (z. B. .retry1). Sie wandert zurück nach pending und wird beim nächsten Durchlauf erneut versucht. Erst wenn das Limit max_retries erreicht ist, wandert sie nach failed und eine Warnmeldung wird per E-Mail an den Admin gesendet.
+* **Duplikatschutz:** Nachrichten werden anhand ihres Inhalts gehasht (SHA256). Bereits verarbeitete Mails werden nicht doppelt gequeut.
+* **Prozess-Sperre (File Locking):** `fcntl` verhindert, dass sich parallele Skriptaufrufe (z. B. bei kurzen Cronjob-Intervallen) gegenseitig blockieren oder Mails doppelt verarbeiten.
+* **Automatische Log-Rotation:** Die Log-Datei wächst nicht unendlich, sondern wird automatisch rotiert (max. 5 MB pro Datei, 5 Backups).
+* **Retry & Admin-Alerts:** Wiederholungsversuche bei temporären Serverstörungen und Benachrichtigung bei persistenten Fehlern.
+* **Retention Policy:** Automatisches Löschen alter zugestellter Mails nach 30 Tagen schont den Speicherplatz.
 
-Features & Schutzmechanismen
-Duplikatschutz: Nachrichten werden anhand ihres Inhalts gehasht (SHA256). Bereits verarbeitete Mails werden nicht doppelt gequeut.
+---
 
-Prozess-Sperre (File Locking): fcntl verhindert, dass sich parallele Skriptaufrufe (z. B. bei kurzen Cronjob-Intervallen) gegenseitig blockieren oder Mails doppelt verarbeiten.
+## Projektstruktur
 
-Automatische Log-Rotation: Die Log-Datei wächst nicht unendlich, sondern wird automatisch rotiert (max. 5 MB pro Datei, 5 Backups).
+```text
+mailfetcher/
+├── config/
+│   └── config.yaml.example   # Vorlage für die Konfiguration
+├── src/
+│   └── fetcher.py            # Hauptprogramm (Python)
+├── systemd/
+│   ├── mailfetcher.service   # Systemd Dienst-Definition
+│   └── mailfetcher.timer     # Systemd Timer (alle 5 Minuten)
+├── install.sh                # Automatisches Installationsskript
+├── requirements.txt          # Python-Abhängigkeiten
+└── README.md                 # Dokumentation
+```
 
-Retry & Admin-Alerts: Wiederholungsversuche bei temporären Serverstörungen und Benachrichtigung bei persistenten Fehlern.
 
-Retention Policy: Automatisches Löschen alter zugestellter Mails nach 30 Tagen schont den Speicherplatz.
 
 Projektstruktur
 Plaintext
