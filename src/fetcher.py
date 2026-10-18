@@ -107,6 +107,48 @@ def save_to_pending(raw):
 
     return target
 
+def move_to_processing(eml_file):
+
+    processing_dir = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "processing"
+    )
+
+    target = (
+        processing_dir
+        / eml_file.name
+    )
+
+    shutil.move(
+        str(eml_file),
+        str(target)
+    )
+
+    return target
+``
+
+def move_to_delivered(eml_file):
+
+    delivered_dir = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "delivered"
+    )
+
+    target = (
+        delivered_dir
+        / eml_file.name
+    )
+
+    shutil.move(
+        str(eml_file),
+        str(target)
+    )
+
+    return target
+``
+
 def connect_pop3():
 
     LOGGER.info(
@@ -232,12 +274,20 @@ def process_pending_queue():
             f"Processing {eml_file.name}"
         )
 
-        recipients = extract_recipients(
+        processing_file = move_to_processing(
             eml_file
         )
 
+        deliver_to_exchange(
+            processing_file
+        )
+
+        move_to_delivered(
+            processing_file
+        )
+
         LOGGER.info(
-            f"Recipients: {recipients}"
+            f"Delivered {processing_file.name}"
         )
 
 def deliver_to_exchange(eml_file):
@@ -284,36 +334,6 @@ def deliver_to_exchange(eml_file):
 
     LOGGER.info(
         "SMTP delivery successful"
-    )
-
-def test_delivery():
-
-    eml_file = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "pending"
-        / "test.eml"
-    )
-
-    deliver_to_exchange(
-        eml_file
-    )
-
-def test_recipient_extraction():
-
-    eml_file = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "pending"
-        / "test.eml"
-    )
-
-    recipients = extract_recipients(
-        eml_file
-    )
-
-    LOGGER.info(
-        f"Recipients found: {recipients}"
     )
 
 
