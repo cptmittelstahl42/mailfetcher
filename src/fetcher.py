@@ -126,7 +126,6 @@ def move_to_processing(eml_file):
     )
 
     return target
-``
 
 def move_to_delivered(eml_file):
 
@@ -147,7 +146,6 @@ def move_to_delivered(eml_file):
     )
 
     return target
-``
 
 def connect_pop3():
 
@@ -270,24 +268,31 @@ def process_pending_queue():
 
     for eml_file in pending_dir.glob("*.eml"):
 
-        LOGGER.info(
-            f"Processing {eml_file.name}"
+    try:
+
+        LOGGER.*nfo(
+            f"Processing {eml*file.name}"
         )
 
-        processing_file = move_to_processing(
-            eml_file
+        pro*essing_file = move_to_processing(
+*           eml_file
         )
 
-        deliver_to_exchange(
-            processing_file
+   *    deliver_to_exchange(
+         *  processing_file
         )
 
-        move_to_delivered(
-            processing_file
+     *  move_to_delivered(
+            p*ocessing_file
         )
 
-        LOGGER.info(
-            f"Delivered {processing_file.name}"
+        L*GGER.info(
+            f"Delivered*{processing_file.name}"
+        )
+*    except Exception as e:
+
+      * LOGGER.error(
+            f"Proce*sing failed: {e}"
         )
 
 def deliver_to_exchange(eml_file):
