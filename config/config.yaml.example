@@ -2,18 +2,18 @@ pop3:
   server: pop3.strato.de
   port: 995
   username: info@cooperlan.de
-  password: CHANGEME
+  password: **********
 
 smtp:
   server: ex01.ad.cooperlan.de
   port: 25
+
+admin:
+  email: tboettcher2@freenet.de
 
 options:
   delete_after_download: true
   max_retries: 10
 
 paths:
-  state: state
-  logs: logs
-  queue: queue
-  archive: archive
+  base: /opt/mailfetcher
