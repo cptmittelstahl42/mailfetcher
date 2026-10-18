@@ -135,9 +135,17 @@ def download_first_message():
         pop.quit()
         return
 
-    response, lines, octets = pop.retr(1)
+    for i in range(1, count + 1):
+
+    response, lines, octets = pop.retr(i)
 
     raw = b"\r\n".join(lines)
+
+    msg = message_from_bytes(raw)
+
+    LOGGER.info(
+        f"Mail {i}: {msg.get('Subject', 'No Subject')}"
+    )
 
     target = (
         Path(CONFIG["paths"]["base"])
