@@ -126,21 +126,25 @@ paths:
 Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das Python-Skript aufruft.
 
 1. Timer aktivieren und starten:
+```text
 Bash
 systemctl enable --now mailfetcher.timer
+```
+
 2. Status prüfen:
-Timer-Status: systemctl status mailfetcher.timer
+Timer-Status: `systemctl status mailfetcher.timer`
 
-Nächste Ausführung anzeigen: systemctl list-timers | grep mailfetcher
+Nächste Ausführung anzeigen: `systemctl list-timers | grep mailfetcher`
 
-Service-Status (letzter Durchlauf): systemctl status mailfetcher.service
+Service-Status (letzter Durchlauf): `systemctl status mailfetcher.service`
 
 3. Manuelle Ausführung (Testlauf):
 Du kannst den Mailfetcher jederzeit manuell anstoßen, ohne auf den Timer zu warten:
-
+```text
 Bash
 systemctl start mailfetcher.service
 Oder direkt über die Python-Umgebung ausführen:
+```
 
 Bash
 /opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
