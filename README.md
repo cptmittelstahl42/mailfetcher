@@ -125,11 +125,7 @@ paths:
 ## Dienst starten & steuern
 Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das Python-Skript aufruft.
 
-1. Timer aktivieren und starten:
-```text
-Bash
-systemctl enable --now mailfetcher.timer
-```
+1. Timer aktivieren und starten: `systemctl enable --now mailfetcher.timer`
 
 2. Status prüfen:
 Timer-Status: `systemctl status mailfetcher.timer`
@@ -143,31 +139,37 @@ Du kannst den Mailfetcher jederzeit manuell anstoßen, ohne auf den Timer zu war
 ```text
 Bash
 systemctl start mailfetcher.service
-Oder direkt über die Python-Umgebung ausführen:
 ```
-
+Oder direkt über die Python-Umgebung ausführen:
+```text
 Bash
 /opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
-Monitoring & Fehlerbehebung
+```
+
+## Monitoring & Fehlerbehebung
 Logs einsehen
 Der Mailfetcher schreibt ausführliche Informationen in seine Log-Datei:
-
+```text
 Bash
 tail -f /opt/mailfetcher/logs/fetcher.log
+```
 Alternativ kannst du die Systemd-Logs nutzen:
-
+```text
 Bash
 journalctl -u mailfetcher.service -n 50 --no-pager
+```
 Was tun, wenn E-Mails in queue/failed landen?
-Prüfe die Log-Datei (fetcher.log), um den Grund für das Scheitern zu ermitteln (z. B. fehlerhafte Empfängeradresse oder Exchange nicht erreichbar).
+Prüfe die Log-Datei (`fetcher.log`), um den Grund für das Scheitern zu ermitteln (z. B. fehlerhafte Empfängeradresse oder Exchange nicht erreichbar).
 
 Korrigiere das zugrunde liegende Problem.
 
-Verschiebe die .eml-Datei manuell zurück in den pending-Ordner, um eine erneute Zustellung zu erzwingen:
-
+Verschiebe die `.eml-Datei` manuell zurück in den pending-Ordner, um eine erneute Zustellung zu erzwingen:
+```text
 Bash
 mv /opt/mailfetcher/queue/failed/*.eml /opt/mailfetcher/queue/pending/
-Lizenz
+```
+
+## Lizenz
 Dieses Projekt steht unter der GNU General Public License v3.0 (GPLv3).
 
 Copyright (c) 2026 Tim Böttcher [cptmittelstahl42]
