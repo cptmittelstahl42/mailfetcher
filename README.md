@@ -82,9 +82,11 @@ chmod +x install.sh
 ```
 
 ## Konfiguration
-Nach der Installation liegt unter `/opt/mailfetcher/config.yaml`  deine Konfigurationsdatei. Bearbeite diese mit einem Texteditor (z. B. nano):
 
-```Bash
+Nach der Installation kopierst du die Konfigurationsvorlage und trägst deine Zugangsdaten ein:
+
+```bash
+cp /opt/mailfetcher/config/config.yaml.example /opt/mailfetcher/config.yaml
 nano /opt/mailfetcher/config.yaml
 ```
 
