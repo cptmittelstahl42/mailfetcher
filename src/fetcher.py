@@ -109,6 +109,53 @@ def connect_pop3():
     )
 
 
+def download_first_message():
+
+    pop = poplib.POP3_SSL(
+        CONFIG["pop3"]["server"],
+        CONFIG["pop3"]["port"]
+    )
+
+    pop.user(
+        CONFIG["pop3"]["username"]
+    )
+
+    pop.pass_(
+        CONFIG["pop3"]["password"]
+    )
+
+    count, size = pop.stat()
+
+    if count == 0:
+
+        LOGGER.info(
+            "Mailbox is empty"
+        )
+
+        pop.quit()
+        return
+
+    response, lines, octets = pop.retr(1)
+
+    raw = b"\r\n".join(lines)
+
+    target = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "pending"
+        / "test.eml"
+    )
+
+    with open(target, "wb") as f:
+        f.write(raw)
+
+    LOGGER.info(
+        f"Downloaded first message ({octets} bytes)"
+    )
+
+    pop.quit()
+
+
 def main():
 
     load_config()
@@ -120,6 +167,8 @@ def main():
     LOGGER.info("Mailfetcher started")
 
     connect_pop3()
+
+    download_first_message()
 
 
 if __name__ == "__main__":
