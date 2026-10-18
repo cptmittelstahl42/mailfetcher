@@ -119,6 +119,8 @@ def main():
 
     LOGGER.info("Mailfetcher started")
 
+    connect_pop3()
+
 
 if __name__ == "__main__":
     main()
