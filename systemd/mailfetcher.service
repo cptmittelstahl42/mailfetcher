@@ -1,1 +1,7 @@
+[Unit]
+Description=Mail Fetcher Service
 
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mailfetcher
+ExecStart=/opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
