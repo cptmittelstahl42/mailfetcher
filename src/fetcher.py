@@ -173,14 +173,6 @@ def download_all_messages():
     LOGGER.info(
         "Download completed"
     )
-    with open(target, "wb") as f:
-        f.write(raw)
-
-    LOGGER.info(
-        f"Downloaded first message ({octets} bytes)"
-    )
-
-    pop.quit()
 
 def extract_recipients(eml_file):
 
