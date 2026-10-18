@@ -66,8 +66,6 @@ mailfetcher/
 ├── install.sh                # Automatisches Installationsskript
 ├── requirements.txt          # Python-Abhängigkeiten
 └── README.md                 # Dokumentation
-```
-
 
 
 Projektstruktur
@@ -83,6 +81,8 @@ mailfetcher/
 ├── install.sh                # Automatisches Installationsskript
 ├── requirements.txt          # Python-Abhängigkeiten
 └── README.md                 # Dokumentation
+```
+
 Installation
 Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter /opt/mailfetcher ein, erstellt eine virtuelle Python-Umgebung (venv), installiert Abhängigkeiten und richtet die Systemd-Dienste ein.
 
