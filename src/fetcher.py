@@ -199,6 +199,65 @@ def extract_recipients(eml_file):
 
     return list(recipients)
 
+def deliver_to_exchange(eml_file):
+
+    with open(eml_file, "rb") as f:
+
+        raw = f.read()
+
+    msg = message_from_bytes(raw)
+
+    recipients = extract_recipients(
+        eml_file
+    )
+
+    sender = msg.get(
+        "Return-Path",
+        ""
+    )
+
+    sender = sender.replace(
+        "<",
+        ""
+    ).replace(
+        ">",
+        ""
+    )
+
+    LOGGER.info(
+        f"Sending mail to {recipients}"
+    )
+
+    smtp = smtplib.SMTP(
+        CONFIG["smtp"]["server"],
+        CONFIG["smtp"]["port"]
+    )
+
+    smtp.sendmail(
+        sender,
+        recipients,
+        raw
+    )
+
+    smtp.quit()
+
+    LOGGER.info(
+        "SMTP delivery successful"
+    )
+
+def test_delivery():
+
+    eml_file = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "pending"
+        / "test.eml"
+    )
+
+    deliver_to_exchange(
+        eml_file
+    )
+
 def test_recipient_extraction():
 
     eml_file = (
@@ -232,6 +291,8 @@ def main():
     download_first_message()
 
     test_recipient_extraction()
+
+    test_delivery()
 
 
 if __name__ == "__main__":
