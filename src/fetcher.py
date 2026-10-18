@@ -157,8 +157,8 @@ def send_admin_alert(failed_file: Path, error_message: str):
 
         LOGGER.info(f"Admin alert sent to {admin_email} for file {failed_file.name}")
 
-    except Exception as e:
-        LOGGER.error(f"Failed to send admin alert email: {e}")
+    except Exception:
+        LOGGER.exception("Failed to send admin alert email")
 
 
 def get_retry_count(eml_file: Path) -> int:
@@ -214,16 +214,17 @@ def download_all_messages():
             response, lines, octets = pop.retr(i)
             raw = b"\r\n".join(lines)
             
+            # Erst lokal auf Festplatte absichern...
             saved_file = save_to_pending(raw)
 
-            # Mails nur auf dem POP3-Server löschen, wenn es in der Config aktiviert ist
+            # ...erst danach auf dem POP3-Server zum Löschen markieren!
             if delete_after_download and saved_file is not None:
                 pop.dele(i)
 
         pop.quit()
         LOGGER.info("Download completed successfully")
-    except Exception as e:
-        LOGGER.error(f"POP3 Error: {e}")
+    except Exception:
+        LOGGER.exception("POP3 Error occurred during download")
 
 
 def extract_recipients(msg):
@@ -298,7 +299,8 @@ def process_pending_queue():
             LOGGER.info(f"Successfully delivered {clean_name}")
 
         except Exception as e:
-            LOGGER.error(f"Processing failed for {eml_file.name}: {e}")
+            # Nutzt LOGGER.exception, um den vollen Traceback im Log zu erfassen
+            LOGGER.exception(f"Processing failed for {eml_file.name}")
             target_file = processing_file if processing_file and processing_file.exists() else eml_file
             if target_file.exists():
                 handle_failed_mail(target_file, str(e))
@@ -338,6 +340,8 @@ def main():
             LOGGER.critical(f"Fatal error in main execution loop: {e}", exc_info=True)
         else:
             print(f"Fatal startup error: {e}")
+        # Beendet das Programm mit Fehlercode, damit Systemd den Fehlschlag erfasst
+        sys.exit(1)
 
 
 if __name__ == "__main__":
