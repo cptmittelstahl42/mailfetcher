@@ -2,28 +2,26 @@
 
 **Mailfetcher** ist ein leichtgewichtiges, robustes Python-Tool zum automatischen Abholen von E-Mails über **POP3** (z. B. von Strato) und der Weiterleitung an einen internen Mailserver (z. B. **Microsoft Exchange**) per **SMTP**.
 
-Das Projekt nutzt ein **dateibasiertes Queue-System** (Warteschlange), um E-Mails auch bei Netzwerkunterbrechungen oder Serverausfällen verlustfrei und zuverlässig zu verarbeiten.
+Das Projekt nutzt ein dateibasiertes Queue-System (Warteschlange), um E-Mails auch bei Netzwerkunterbrechungen oder Serverausfällen verlustfrei und zuverlässig zu verarbeiten.
 
 ## Status
 
-Projektstatus: Release Candidate
-
-Getestet mit:
-
-- Debian 13
-- Microsoft Exchange Server 2019
-- Strato POP3
-- Python 3.13
+* **Projektstatus:** Release Candidate (v1.0.0-rc1)
+* **Getestet mit:**
+  * Debian 13
+  * Microsoft Exchange Server 2019
+  * Strato POP3
+  * Python 3.13
 
 Das Projekt befindet sich in aktivem Einsatz im Homelab-Betrieb und unterstützt Queue-Verarbeitung, Retry-Mechanismen, Admin-Benachrichtigungen und automatisierte Bereinigung von Zustellungsarchiven.
 
 ---
 
-## 💡 Grundkonzept & Funktionsweise
+## Architektur & Funktionsweise
 
-### Wie funktioniert die Warteschlange (Queue)?
+### Warteschlange (Queue)
 
-Anstatt eine E-Mail direkt vom POP3-Server an den Exchange-Server "durchzureichen", durchläuft jede Mail mehrere Ordner unter `/opt/mailfetcher/queue/`. So geht selbst bei einem Absturz oder Serverausfall keine Mail verloren.
+Anstatt eine E-Mail direkt vom POP3-Server an den Exchange-Server durchzureichen, durchläuft jede Mail mehrere Ordner unter `/opt/mailfetcher/queue/`. So geht selbst bei einem Absturz oder Serverausfall keine Mail verloren.
 
 ```text
 [ POP3 Server ] ──(Download)──> [ pending ] ──(In Bearbeitung)──> [ processing ]
@@ -35,20 +33,15 @@ Anstatt eine E-Mail direkt vom POP3-Server an den Exchange-Server "durchzureiche
                                                      │                                     │ (max_retries)
                                              (Löschung nach 30 Tage)                       ▼
                                                                                       [ failed ] ──> (Admin-Alert)
+queue/pending (Wartend): E-Mails werden per POP3 heruntergeladen, mit einem eindeutigen SHA256-Hash als Dateinamen (.eml) versehen und hier gespeichert. Falls konfiguriert, werden sie direkt danach auf dem POP3-Server gelöscht.
 
-queue/pending (Wartend):
-E-Mails werden per POP3 heruntergeladen, mit einem eindeutigen SHA256-Hash als Dateinamen (.eml) versehen und hier gespeichert. Falls konfiguriert, werden sie direkt danach auf dem POP3-Server gelöscht.
+queue/processing (In Bearbeitung): Vor dem Senden wird die Mail in diesen Ordner verschoben. Sollte das Skript während des Sendevorgangs abstürzen, bleibt die Datei hier greifbar.
 
-queue/processing (In Bearbeitung):
-Vor dem Senden wird die Mail in diesen Ordner verschoben. Sollte das Skript während des Sendevorgangs abstürzen, bleibt die Datei hier greifbar.
+queue/delivered (Zugestellt): Nach erfolgreicher Zustellung via SMTP an den Exchange-Server wandert die Mail hierhin. Ein automatischer Aufräumprozess löscht Dateien in diesem Ordner nach 30 Tagen.
 
-queue/delivered (Zugestellt):
-Nach erfolgreicher Zustellung via SMTP an den Exchange-Server wandert die Mail hierhin. Ein automatischer Aufräumprozess löscht Dateien in diesem Ordner nach 30 Tagen.
+queue/failed (Fehlgeschlagen): Schlägt die Zustellung fehl, erhält die Datei ein Retry-Suffix (z. B. .retry1). Sie wandert zurück nach pending und wird beim nächsten Durchlauf erneut versucht. Erst wenn das Limit max_retries erreicht ist, wandert sie nach failed und eine Warnmeldung wird per E-Mail an den Admin gesendet.
 
-queue/failed (Fehlgeschlagen):
-Schlägt die Zustellung fehl, erhält die Datei ein Retry-Suffix (z. B. .retry1). Sie wandert zurück nach pending und wird beim nächsten Durchlauf erneut versucht. Erst wenn das Limit max_retries erreicht ist, wandert sie nach failed und eine Warnmeldung wird per E-Mail an den Admin gesendet.
-
-🛠 Features & Schutzmechanismen
+Features & Schutzmechanismen
 Duplikatschutz: Nachrichten werden anhand ihres Inhalts gehasht (SHA256). Bereits verarbeitete Mails werden nicht doppelt gequeut.
 
 Prozess-Sperre (File Locking): fcntl verhindert, dass sich parallele Skriptaufrufe (z. B. bei kurzen Cronjob-Intervallen) gegenseitig blockieren oder Mails doppelt verarbeiten.
@@ -59,7 +52,7 @@ Retry & Admin-Alerts: Wiederholungsversuche bei temporären Serverstörungen und
 
 Retention Policy: Automatisches Löschen alter zugestellter Mails nach 30 Tagen schont den Speicherplatz.
 
-📁 Projektstruktur
+Projektstruktur
 Plaintext
 mailfetcher/
 ├── config/
@@ -72,7 +65,7 @@ mailfetcher/
 ├── install.sh                # Automatisches Installationsskript
 ├── requirements.txt          # Python-Abhängigkeiten
 └── README.md                 # Dokumentation
-🚀 Installation
+Installation
 Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter /opt/mailfetcher ein, erstellt eine virtuelle Python-Umgebung (venv), installiert Abhängigkeiten und richtet die Systemd-Dienste ein.
 
 Führe als root im geklonten Repository folgenden Befehl aus:
@@ -80,7 +73,7 @@ Führe als root im geklonten Repository folgenden Befehl aus:
 Bash
 chmod +x install.sh
 ./install.sh
-⚙️ Konfiguration
+Konfiguration
 Nach der Installation liegt unter /opt/mailfetcher/config.yaml deine Konfigurationsdatei. Bearbeite diese mit einem Texteditor (z. B. nano):
 
 Bash
@@ -115,7 +108,7 @@ options:
 # Systempfade
 paths:
   base: /opt/mailfetcher
-🟢 Dienst starten & steuern
+Dienst starten & steuern
 Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das Python-Skript aufruft.
 
 1. Timer aktivieren und starten:
@@ -137,7 +130,7 @@ Oder direkt über die Python-Umgebung ausführen:
 
 Bash
 /opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
-🔍 Monitoring & Fehlerbehebung (Troubleshooting)
+Monitoring & Fehlerbehebung
 Logs einsehen
 Der Mailfetcher schreibt ausführliche Informationen in seine Log-Datei:
 
@@ -156,10 +149,7 @@ Verschiebe die .eml-Datei manuell zurück in den pending-Ordner, um eine erneute
 
 Bash
 mv /opt/mailfetcher/queue/failed/*.eml /opt/mailfetcher/queue/pending/
-
-
-## Lizenz
-
+Lizenz
 Dieses Projekt steht unter der GNU General Public License v3.0 (GPLv3).
 
 Copyright (c) 2026 Tim Böttcher [cptmittelstahl42]
