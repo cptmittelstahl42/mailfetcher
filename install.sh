@@ -25,9 +25,11 @@ mkdir -p \
     ${INSTALL_DIR}/queue/delivered \
     ${INSTALL_DIR}/queue/failed
 
+
 echo "[INFO] Copying application files..."
 # Kopiert Quellcode und requirements ins Zielverzeichnis
 cp -r ${SCRIPT_DIR}/src/* ${INSTALL_DIR}/src/ 2>/dev/null || true
+cp -r ${SCRIPT_DIR}/config/* ${INSTALL_DIR}/config/ 2>/dev/null || true
 cp ${SCRIPT_DIR}/requirements.txt ${INSTALL_DIR}/ 2>/dev/null || true
 
 # Erstellt eine config.yaml aus der Example-Datei, falls noch keine existiert
