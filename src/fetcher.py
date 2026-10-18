@@ -77,6 +77,36 @@ def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def save_to_pending(raw):
+
+    mail_hash = sha256_bytes(raw)
+
+    filename = f"{mail_hash}.eml"
+
+    target = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "pending"
+        / filename
+    )
+
+    if target.exists():
+
+        LOGGER.info(
+            f"Mail already queued: {filename}"
+        )
+
+        return None
+
+    with open(target, "wb") as f:
+        f.write(raw)
+
+    LOGGER.info(
+        f"Queued mail: {filename}"
+    )
+
+    return target
+
 def connect_pop3():
 
     LOGGER.info(
@@ -109,7 +139,7 @@ def connect_pop3():
     )
 
 
-def download_first_message():
+def download_all_messages():
 
     pop = poplib.POP3_SSL(
         CONFIG["pop3"]["server"],
@@ -126,14 +156,9 @@ def download_first_message():
 
     count, size = pop.stat()
 
-    if count == 0:
-
-        LOGGER.info(
-            "Mailbox is empty"
-        )
-
-        pop.quit()
-        return
+    LOGGER.info(
+        f"Downloading {count} messages"
+    )
 
     for i in range(1, count + 1):
 
@@ -141,19 +166,13 @@ def download_first_message():
 
         raw = b"\r\n".join(lines)
 
-        msg = message_from_bytes(raw)
+        save_to_pending(raw)
 
-        LOGGER.info(
-            f"Mail {i}: {msg.get('Subject', 'No Subject')}"
-        )
+    pop.quit()
 
-    target = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "pending"
-        / "test.eml"
+    LOGGER.info(
+        "Download completed"
     )
-
     with open(target, "wb") as f:
         f.write(raw)
 
@@ -296,11 +315,7 @@ def main():
 
     connect_pop3()
 
-    download_first_message()
-
-    test_recipient_extraction()
-
-    test_delivery()
+    download_all_messages()
 
 
 if __name__ == "__main__":
