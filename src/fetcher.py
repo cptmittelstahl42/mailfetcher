@@ -22,17 +22,13 @@ LOGGER = None
 
 def load_config():
     global CONFIG
-
     config_file = Path("/opt/mailfetcher/config.yaml")
-
     with open(config_file, "r") as f:
         CONFIG = yaml.safe_load(f)
 
 
 def setup_directories():
-
     base = Path(CONFIG["paths"]["base"])
-
     dirs = [
         base / "logs",
         base / "state",
@@ -44,16 +40,11 @@ def setup_directories():
     ]
 
     for directory in dirs:
-        directory.mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        directory.mkdir(parents=True, exist_ok=True)
 
 
 def setup_logging():
-
     global LOGGER
-
     logfile = (
         Path(CONFIG["paths"]["base"])
         / "logs"
@@ -68,21 +59,16 @@ def setup_logging():
             logging.StreamHandler()
         ]
     )
-
     LOGGER = logging.getLogger("mailfetcher")
 
 
 def sha256_bytes(data):
-
     return hashlib.sha256(data).hexdigest()
 
 
 def save_to_pending(raw):
-
     mail_hash = sha256_bytes(raw)
-
     filename = f"{mail_hash}.eml"
-
     target = (
         Path(CONFIG["paths"]["base"])
         / "queue"
@@ -91,262 +77,150 @@ def save_to_pending(raw):
     )
 
     if target.exists():
-
-        LOGGER.info(
-            f"Mail already queued: {filename}"
-        )
-
+        LOGGER.info(f"Mail already queued: {filename}")
         return None
 
     with open(target, "wb") as f:
         f.write(raw)
 
-    LOGGER.info(
-        f"Queued mail: {filename}"
-    )
-
+    LOGGER.info(f"Queued mail: {filename}")
     return target
+
+
+def move_file(src_file: Path, target_dir_name: str) -> Path:
+    """Hilfsfunktion zum sicheren Verschieben innerhalb der Queue."""
+    target_dir = Path(CONFIG["paths"]["base"]) / "queue" / target_dir_name
+    target = target_dir / src_file.name
+    shutil.move(str(src_file), str(target))
+    return target
+
 
 def move_to_processing(eml_file):
+    return move_file(eml_file, "processing")
 
-    processing_dir = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "processing"
-    )
-
-    target = (
-        processing_dir
-        / eml_file.name
-    )
-
-    shutil.move(
-        str(eml_file),
-        str(target)
-    )
-
-    return target
 
 def move_to_delivered(eml_file):
+    return move_file(eml_file, "delivered")
 
-    delivered_dir = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "delivered"
-    )
 
-    target = (
-        delivered_dir
-        / eml_file.name
-    )
-
-    shutil.move(
-        str(eml_file),
-        str(target)
-    )
-
-    return target
-
-def connect_pop3():
-
-    LOGGER.info(
-        f"Connecting to {CONFIG['pop3']['server']}"
-    )
-
-    pop = poplib.POP3_SSL(
-        CONFIG["pop3"]["server"],
-        CONFIG["pop3"]["port"]
-    )
-
-    pop.user(
-        CONFIG["pop3"]["username"]
-    )
-
-    pop.pass_(
-        CONFIG["pop3"]["password"]
-    )
-
-    count, size = pop.stat()
-
-    LOGGER.info(
-        f"Mailbox contains {count} messages ({size} bytes)"
-    )
-
-    pop.quit()
-
-    LOGGER.info(
-        "POP3 connection closed"
-    )
+def move_to_failed(eml_file):
+    return move_file(eml_file, "failed")
 
 
 def download_all_messages():
-
-    pop = poplib.POP3_SSL(
-        CONFIG["pop3"]["server"],
-        CONFIG["pop3"]["port"]
-    )
-
-    pop.user(
-        CONFIG["pop3"]["username"]
-    )
-
-    pop.pass_(
-        CONFIG["pop3"]["password"]
-    )
-
-    count, size = pop.stat()
-
-    LOGGER.info(
-        f"Downloading {count} messages"
-    )
-
-    for i in range(1, count + 1):
-
-        response, lines, octets = pop.retr(i)
-
-        raw = b"\r\n".join(lines)
-
-        save_to_pending(raw)
-
-    pop.quit()
-
-    LOGGER.info(
-        "Download completed"
-    )
-
-def extract_recipients(eml_file):
-
-    with open(eml_file, "rb") as f:
-        msg = message_from_bytes(
-            f.read()
+    timeout = CONFIG["pop3"].get("timeout", 30)
+    
+    try:
+        pop = poplib.POP3_SSL(
+            CONFIG["pop3"]["server"],
+            CONFIG["pop3"]["port"],
+            timeout=timeout
         )
+        pop.user(CONFIG["pop3"]["username"])
+        pop.pass_(CONFIG["pop3"]["password"])
 
+        count, size = pop.stat()
+        LOGGER.info(f"Downloading {count} messages ({size} bytes)")
+
+        for i in range(1, count + 1):
+            response, lines, octets = pop.retr(i)
+            raw = b"\r\n".join(lines)
+            save_to_pending(raw)
+            
+            # OPTIONAL: Wenn Mails nach dem Abholen auf dem POP3-Server gelöscht werden sollen:
+            # pop.dele(i)
+
+        pop.quit()
+        LOGGER.info("Download completed successfully")
+    except Exception as e:
+        LOGGER.error(f"POP3 Error: {e}")
+
+
+def extract_recipients(msg):
     recipients = set()
 
-    for header in (
-        "X-Original-To",
-        "Delivered-To",
-        "Envelope-To",
-        "To",
-        "Cc"
-    ):
-
+    for header in ("X-Original-To", "Delivered-To", "Envelope-To", "To", "Cc"):
         if header in msg:
-
             recipients.update(
-                addr
-                for _, addr
-                in getaddresses(
-                    [msg[header]]
-                )
+                addr for _, addr in getaddresses([msg[header]]) if addr
             )
 
-    received_headers = msg.get_all(
-        "Received",
-        []
-    )
-
+    received_headers = msg.get_all("Received", [])
     for received in received_headers:
-
         matches = re.findall(
             r'for\s+<?([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>?',
             received,
             re.IGNORECASE
         )
-
         recipients.update(matches)
 
     return list(recipients)
 
-def process_pending_queue():
-    pending_dir = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "pending"
-    )
-
-    # glob("*.eml") nutzt die Wildcard *, um alle EML-Dateien zu finden
-    for eml_file in pending_dir.glob("*.eml"):
-        try:
-            LOGGER.info(
-                f"Processing {eml_file.name}"
-            )
-
-            processing_file = move_to_processing(eml_file)
-            deliver_to_exchange(processing_file)
-            move_to_delivered(processing_file)
-
-            LOGGER.info(
-                f"Delivered {processing_file.name}"
-            )
-        except Exception as e:
-            LOGGER.error(
-                f"Processing failed for {eml_file.name}: {e}"
-            )
-            # WICHTIG: Fehlerbehandlung / Verschieben nach failed!
-            move_to_failed(processing_file if 'processing_file' in locals() else eml_file)
 
 def deliver_to_exchange(eml_file):
-
     with open(eml_file, "rb") as f:
-
         raw = f.read()
 
     msg = message_from_bytes(raw)
+    recipients = extract_recipients(msg)
 
-    recipients = extract_recipients(
-        eml_file
-    )
+    if not recipients:
+        raise ValueError("No valid recipients found in headers.")
 
-    sender = msg.get(
-        "Return-Path",
-        ""
-    )
+    # Absender bestimmen mit Fallback auf From oder Config
+    sender = msg.get("Return-Path", msg.get("From", ""))
+    sender = re.sub(r'[<>]', '', sender).strip()
+    
+    if not sender and "default_sender" in CONFIG.get("smtp", {}):
+        sender = CONFIG["smtp"]["default_sender"]
 
-    sender = sender.replace(
-        "<",
-        ""
-    ).replace(
-        ">",
-        ""
-    )
+    LOGGER.info(f"Sending mail from {sender} to {recipients}")
 
-    LOGGER.info(
-        f"Sending mail to {recipients}"
-    )
+    timeout = CONFIG["smtp"].get("timeout", 30)
+    with smtplib.SMTP(CONFIG["smtp"]["server"], CONFIG["smtp"]["port"], timeout=timeout) as smtp:
+        # Falls Exchange STARTTLS erfordert:
+        if CONFIG["smtp"].get("use_tls", False):
+            smtp.starttls()
+            
+        if "username" in CONFIG["smtp"] and "password" in CONFIG["smtp"]:
+            smtp.login(CONFIG["smtp"]["username"], CONFIG["smtp"]["password"])
 
-    smtp = smtplib.SMTP(
-        CONFIG["smtp"]["server"],
-        CONFIG["smtp"]["port"]
-    )
+        smtp.sendmail(sender, recipients, raw)
 
-    smtp.sendmail(
-        sender,
-        recipients,
-        raw
-    )
+    LOGGER.info("SMTP delivery successful")
 
-    smtp.quit()
 
-    LOGGER.info(
-        "SMTP delivery successful"
-    )
+def process_pending_queue():
+    pending_dir = Path(CONFIG["paths"]["base"]) / "queue" / "pending"
+
+    # Wildcard-Suche nach allen .eml Dateien im pending Ordner
+    for eml_file in pending_dir.glob("*.eml"):
+        processing_file = None
+        try:
+            LOGGER.info(f"Processing {eml_file.name}")
+            processing_file = move_to_processing(eml_file)
+            
+            deliver_to_exchange(processing_file)
+            
+            move_to_delivered(processing_file)
+            LOGGER.info(f"Successfully delivered {eml_file.name}")
+
+        except Exception as e:
+            LOGGER.error(f"Processing failed for {eml_file.name}: {e}")
+            # Bei Fehler Datei nach queue/failed verschieben
+            failed_target = processing_file if processing_file and processing_file.exists() else eml_file
+            if failed_target.exists():
+                move_to_failed(failed_target)
 
 
 def main():
-
     load_config()
-
     setup_directories()
-
     setup_logging()
 
     LOGGER.info("Mailfetcher started")
 
-    connect_pop3()
-
     download_all_messages()
-
     process_pending_queue()
 
 
