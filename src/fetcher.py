@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 
+import fcntl
+import hashlib
 import json
 import logging
-import hashlib
+from logging.handlers import RotatingFileHandler
 import poplib
-import smtplib
-import shutil
 import re
-
-from pathlib import Path
+import shutil
+import smtplib
+import sys
+import time
 from datetime import datetime
+from email.message import EmailMessage
 from email import message_from_bytes
 from email.utils import getaddresses
+from pathlib import Path
 
 import yaml
 
 
 CONFIG = None
 LOGGER = None
+LOCK_FILE_HANDLE = None
 
 
 def load_config():
@@ -45,21 +50,35 @@ def setup_directories():
 
 def setup_logging():
     global LOGGER
-    logfile = (
-        Path(CONFIG["paths"]["base"])
-        / "logs"
-        / "fetcher.log"
+    logfile = Path(CONFIG["paths"]["base"]) / "logs" / "fetcher.log"
+
+    # Rotating Log: max 5 MB pro Datei, behält 5 alte Logfiles
+    file_handler = RotatingFileHandler(
+        logfile, maxBytes=5 * 1024 * 1024, backupCount=5
     )
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(message)s",
         handlers=[
-            logging.FileHandler(logfile),
+            file_handler,
             logging.StreamHandler()
         ]
     )
     LOGGER = logging.getLogger("mailfetcher")
+
+
+def acquire_lock():
+    """Verhindert parallele Ausführungen des Skripts (z. B. bei kurzen Cronjob-Intervallen)."""
+    global LOCK_FILE_HANDLE
+    lock_file = Path(CONFIG["paths"]["base"]) / "state" / "fetcher.lock"
+    
+    LOCK_FILE_HANDLE = open(lock_file, "w")
+    try:
+        fcntl.flock(LOCK_FILE_HANDLE, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        LOGGER.warning("Mailfetcher is already running. Exiting process.")
+        sys.exit(0)
 
 
 def sha256_bytes(data):
@@ -69,12 +88,7 @@ def sha256_bytes(data):
 def save_to_pending(raw):
     mail_hash = sha256_bytes(raw)
     filename = f"{mail_hash}.eml"
-    target = (
-        Path(CONFIG["paths"]["base"])
-        / "queue"
-        / "pending"
-        / filename
-    )
+    target = Path(CONFIG["paths"]["base"]) / "queue" / "pending" / filename
 
     if target.exists():
         LOGGER.info(f"Mail already queued: {filename}")
@@ -88,7 +102,7 @@ def save_to_pending(raw):
 
 
 def move_file(src_file: Path, target_dir_name: str) -> Path:
-    """Hilfsfunktion zum sicheren Verschieben innerhalb der Queue."""
+    """Hilfsfunktion zum sicheren Verschieben innerhalb der Queue-Ordner."""
     target_dir = Path(CONFIG["paths"]["base"]) / "queue" / target_dir_name
     target = target_dir / src_file.name
     shutil.move(str(src_file), str(target))
@@ -99,17 +113,82 @@ def move_to_processing(eml_file):
     return move_file(eml_file, "processing")
 
 
-def move_to_delivered(eml_file):
-    return move_file(eml_file, "delivered")
+def send_admin_alert(failed_file: Path, error_message: str):
+    """Verschickt eine Benachrichtigung per E-Mail an den Admin bei endgültigem Fehlschlag."""
+    admin_email = CONFIG.get("admin", {}).get("email")
+    if not admin_email:
+        LOGGER.warning("No admin email configured in config.yaml. Skipping alert.")
+        return
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = f"[ALERT] Mailfetcher Delivery Failed: {failed_file.name}"
+        msg["From"] = CONFIG.get("smtp", {}).get("default_sender", "mailfetcher@cooperlan.de")
+        msg["To"] = admin_email
+
+        body = (
+            f"Hallo Admin,\n\n"
+            f"eine E-Mail konnte nach mehreren Versuchen nicht zugestellt werden und wurde nach 'queue/failed' verschoben.\n\n"
+            f"Datei: {failed_file.name}\n"
+            f"Pfad: {failed_file.absolute()}\n"
+            f"Fehlermeldung: {error_message}\n\n"
+            f"Bitte prüfe den Exchange-Server oder die Datei manuell.\n\n"
+            f"Dein Mailfetcher Service"
+        )
+        msg.set_content(body)
+
+        timeout = CONFIG["smtp"].get("timeout", 30)
+        with smtplib.SMTP(CONFIG["smtp"]["server"], CONFIG["smtp"]["port"], timeout=timeout) as smtp:
+            if CONFIG["smtp"].get("use_tls", False):
+                smtp.starttls()
+            if "username" in CONFIG["smtp"] and "password" in CONFIG["smtp"]:
+                smtp.login(CONFIG["smtp"]["username"], CONFIG["smtp"]["password"])
+            
+            smtp.send_message(msg)
+
+        LOGGER.info(f"Admin alert sent to {admin_email} for file {failed_file.name}")
+
+    except Exception as e:
+        LOGGER.error(f"Failed to send admin alert email: {e}")
 
 
-def move_to_failed(eml_file):
-    return move_file(eml_file, "failed")
+def get_retry_count(eml_file: Path) -> int:
+    """Ermittelt die Anzahl bisheriger Versuche anhand des Suffixes im Dateinamen."""
+    match = re.search(r'\.retry(\d+)$', eml_file.name)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
+def handle_failed_mail(processing_file: Path, error_message: str):
+    """Verwaltet Fehlversuche und verschiebt die Mail nach Retries oder endgültig nach failed."""
+    max_retries = CONFIG.get("options", {}).get("max_retries", 3)
+    current_retries = get_retry_count(processing_file)
+    base_name = re.sub(r'\.retry\d+$', '', processing_file.name)
+
+    if current_retries < max_retries:
+        next_retry = current_retries + 1
+        new_filename = f"{base_name}.retry{next_retry}"
+        target = Path(CONFIG["paths"]["base"]) / "queue" / "pending" / new_filename
+        
+        shutil.move(str(processing_file), str(target))
+        LOGGER.warning(
+            f"Retry {next_retry}/{max_retries} scheduled for {base_name}. Re-queued to pending."
+        )
+    else:
+        # Max Retries erreicht -> Endgültig nach failed verschieben & Admin benachrichtigen
+        target = Path(CONFIG["paths"]["base"]) / "queue" / "failed" / base_name
+        shutil.move(str(processing_file), str(target))
+        LOGGER.error(
+            f"Max retries ({max_retries}) reached for {base_name}. Moved permanently to failed."
+        )
+        send_admin_alert(target, error_message)
 
 
 def download_all_messages():
     timeout = CONFIG["pop3"].get("timeout", 30)
-    
+    delete_after_download = CONFIG.get("options", {}).get("delete_after_download", False)
+
     try:
         pop = poplib.POP3_SSL(
             CONFIG["pop3"]["server"],
@@ -126,11 +205,11 @@ def download_all_messages():
             response, lines, octets = pop.retr(i)
             raw = b"\r\n".join(lines)
             
-            # Speicherst du die Mail erfolgreich...
             saved_file = save_to_pending(raw)
-            
-            # ...lösche sie auf dem POP3-Server, damit sie nicht erneut heruntergeladen wird
-            pop.dele(i)
+
+            # Mails nur auf dem POP3-Server löschen, wenn es in der Config aktiviert ist
+            if delete_after_download and saved_file is not None:
+                pop.dele(i)
 
         pop.quit()
         LOGGER.info("Download completed successfully")
@@ -169,7 +248,6 @@ def deliver_to_exchange(eml_file):
     if not recipients:
         raise ValueError("No valid recipients found in headers.")
 
-    # Absender bestimmen mit Fallback auf From oder Config
     sender = msg.get("Return-Path", msg.get("From", ""))
     sender = re.sub(r'[<>]', '', sender).strip()
     
@@ -180,7 +258,6 @@ def deliver_to_exchange(eml_file):
 
     timeout = CONFIG["smtp"].get("timeout", 30)
     with smtplib.SMTP(CONFIG["smtp"]["server"], CONFIG["smtp"]["port"], timeout=timeout) as smtp:
-        # Falls Exchange STARTTLS erfordert:
         if CONFIG["smtp"].get("use_tls", False):
             smtp.starttls()
             
@@ -192,44 +269,9 @@ def deliver_to_exchange(eml_file):
     LOGGER.info("SMTP delivery successful")
 
 
-def get_retry_count(eml_file: Path) -> int:
-    """Ermittelt die Anzahl bisheriger Versuche anhand des Dateinamens."""
-    match = re.search(r'\.retry(\d+)$', eml_file.name)
-    if match:
-        return int(match.group(1))
-    return 0
-
-
-def handle_failed_mail(processing_file: Path):
-    """Verwaltet Fehlversuche und prüft max_retries aus der config.yaml."""
-    max_retries = CONFIG.get("options", {}).get("max_retries", 3)
-    current_retries = get_retry_count(processing_file)
-    
-    # Basis-Dateiname ohne alten Retry-Suffix ermitteln
-    base_name = re.sub(r'\.retry\d+$', '', processing_file.name)
-
-    if current_retries < max_retries:
-        next_retry = current_retries + 1
-        new_filename = f"{base_name}.retry{next_retry}"
-        target = Path(CONFIG["paths"]["base"]) / "queue" / "pending" / new_filename
-        
-        shutil.move(str(processing_file), str(target))
-        LOGGER.warning(
-            f"Retry {next_retry}/{max_retries} scheduled for {base_name}. Re-queued to pending."
-        )
-    else:
-        # Max Retries erreicht -> Endgültig nach failed verschieben
-        target = Path(CONFIG["paths"]["base"]) / "queue" / "failed" / base_name
-        shutil.move(str(processing_file), str(target))
-        LOGGER.error(
-            f"Max retries ({max_retries}) reached for {base_name}. Moved permanently to failed."
-        )
-
-
 def process_pending_queue():
     pending_dir = Path(CONFIG["paths"]["base"]) / "queue" / "pending"
 
-    # Verarbeitet alle Dateien in pending (sowohl .eml als auch .eml.retryX)
     for eml_file in pending_dir.glob("*.eml*"):
         processing_file = None
         try:
@@ -238,7 +280,7 @@ def process_pending_queue():
             
             deliver_to_exchange(processing_file)
             
-            # Bei Erfolg: Zurück zum Originalnamen bereinigen und nach delivered verschieben
+            # Bei Erfolg Name bereinigen und in delivered verschieben
             clean_name = re.sub(r'\.retry\d+$', '', processing_file.name)
             delivered_dir = Path(CONFIG["paths"]["base"]) / "queue" / "delivered"
             target = delivered_dir / clean_name
@@ -248,10 +290,21 @@ def process_pending_queue():
 
         except Exception as e:
             LOGGER.error(f"Processing failed for {eml_file.name}: {e}")
-            if processing_file and processing_file.exists():
-                handle_failed_mail(processing_file)
-            elif eml_file.exists():
-                handle_failed_mail(eml_file)
+            target_file = processing_file if processing_file and processing_file.exists() else eml_file
+            if target_file.exists():
+                handle_failed_mail(target_file, str(e))
+
+
+def cleanup_old_delivered_mails(days=30):
+    """Löscht Mails in queue/delivered, die älter als X Tage sind."""
+    delivered_dir = Path(CONFIG["paths"]["base"]) / "queue" / "delivered"
+    now = time.time()
+    cutoff = now - (days * 86400)
+
+    for eml_file in delivered_dir.glob("*.eml"):
+        if eml_file.stat().st_mtime < cutoff:
+            eml_file.unlink()
+            LOGGER.info(f"Cleaned up old delivered mail: {eml_file.name}")
 
 
 def main():
@@ -260,13 +313,14 @@ def main():
         setup_directories()
         setup_logging()
 
+        # Doppelstarts bei kurzen Cronjob-Intervallen blockieren
+        acquire_lock()
+
         LOGGER.info("Mailfetcher started")
 
-        # 1. Mails abholen & in pending ablegen (und ggf. vom POP3 löschen)
         download_all_messages()
-
-        # 2. Queue abarbeiten (inkl. Retry-Mechanismus)
         process_pending_queue()
+        cleanup_old_delivered_mails(days=30)
 
         LOGGER.info("Mailfetcher run finished successfully")
 
