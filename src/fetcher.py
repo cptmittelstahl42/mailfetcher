@@ -192,11 +192,45 @@ def deliver_to_exchange(eml_file):
     LOGGER.info("SMTP delivery successful")
 
 
+def get_retry_count(eml_file: Path) -> int:
+    """Ermittelt die Anzahl bisheriger Versuche anhand des Dateinamens."""
+    match = re.search(r'\.retry(\d+)$', eml_file.name)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
+def handle_failed_mail(processing_file: Path):
+    """Verwaltet Fehlversuche und prüft max_retries aus der config.yaml."""
+    max_retries = CONFIG.get("options", {}).get("max_retries", 3)
+    current_retries = get_retry_count(processing_file)
+    
+    # Basis-Dateiname ohne alten Retry-Suffix ermitteln
+    base_name = re.sub(r'\.retry\d+$', '', processing_file.name)
+
+    if current_retries < max_retries:
+        next_retry = current_retries + 1
+        new_filename = f"{base_name}.retry{next_retry}"
+        target = Path(CONFIG["paths"]["base"]) / "queue" / "pending" / new_filename
+        
+        shutil.move(str(processing_file), str(target))
+        LOGGER.warning(
+            f"Retry {next_retry}/{max_retries} scheduled for {base_name}. Re-queued to pending."
+        )
+    else:
+        # Max Retries erreicht -> Endgültig nach failed verschieben
+        target = Path(CONFIG["paths"]["base"]) / "queue" / "failed" / base_name
+        shutil.move(str(processing_file), str(target))
+        LOGGER.error(
+            f"Max retries ({max_retries}) reached for {base_name}. Moved permanently to failed."
+        )
+
+
 def process_pending_queue():
     pending_dir = Path(CONFIG["paths"]["base"]) / "queue" / "pending"
 
-    # Wildcard-Suche nach allen .eml Dateien im pending Ordner
-    for eml_file in pending_dir.glob("*.eml"):
+    # Verarbeitet alle Dateien in pending (sowohl .eml als auch .eml.retryX)
+    for eml_file in pending_dir.glob("*.eml*"):
         processing_file = None
         try:
             LOGGER.info(f"Processing {eml_file.name}")
@@ -204,26 +238,43 @@ def process_pending_queue():
             
             deliver_to_exchange(processing_file)
             
-            move_to_delivered(processing_file)
-            LOGGER.info(f"Successfully delivered {eml_file.name}")
+            # Bei Erfolg: Zurück zum Originalnamen bereinigen und nach delivered verschieben
+            clean_name = re.sub(r'\.retry\d+$', '', processing_file.name)
+            delivered_dir = Path(CONFIG["paths"]["base"]) / "queue" / "delivered"
+            target = delivered_dir / clean_name
+            shutil.move(str(processing_file), str(target))
+            
+            LOGGER.info(f"Successfully delivered {clean_name}")
 
         except Exception as e:
             LOGGER.error(f"Processing failed for {eml_file.name}: {e}")
-            # Bei Fehler Datei nach queue/failed verschieben
-            failed_target = processing_file if processing_file and processing_file.exists() else eml_file
-            if failed_target.exists():
-                move_to_failed(failed_target)
+            if processing_file and processing_file.exists():
+                handle_failed_mail(processing_file)
+            elif eml_file.exists():
+                handle_failed_mail(eml_file)
 
 
 def main():
-    load_config()
-    setup_directories()
-    setup_logging()
+    try:
+        load_config()
+        setup_directories()
+        setup_logging()
 
-    LOGGER.info("Mailfetcher started")
+        LOGGER.info("Mailfetcher started")
 
-    download_all_messages()
-    process_pending_queue()
+        # 1. Mails abholen & in pending ablegen (und ggf. vom POP3 löschen)
+        download_all_messages()
+
+        # 2. Queue abarbeiten (inkl. Retry-Mechanismus)
+        process_pending_queue()
+
+        LOGGER.info("Mailfetcher run finished successfully")
+
+    except Exception as e:
+        if LOGGER:
+            LOGGER.critical(f"Fatal error in main execution loop: {e}", exc_info=True)
+        else:
+            print(f"Fatal startup error: {e}")
 
 
 if __name__ == "__main__":
