@@ -1,7 +1,10 @@
 [Unit]
-Description=Mail Fetcher Service
+Description=Mailfetcher POP3 Connector
+After=network-online.target
 
 [Service]
 Type=oneshot
+User=root
+Group=root
 WorkingDirectory=/opt/mailfetcher
 ExecStart=/opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
