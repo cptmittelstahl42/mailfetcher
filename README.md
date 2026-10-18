@@ -33,6 +33,8 @@ Anstatt eine E-Mail direkt vom POP3-Server an den Exchange-Server durchzureichen
                                                      │                                     │ (max_retries)
                                              (Löschung nach 30 Tage)                       ▼
                                                                                       [ failed ] ──> (Admin-Alert)
+```
+
 queue/pending (Wartend): E-Mails werden per POP3 heruntergeladen, mit einem eindeutigen SHA256-Hash als Dateinamen (.eml) versehen und hier gespeichert. Falls konfiguriert, werden sie direkt danach auf dem POP3-Server gelöscht.
 
 queue/processing (In Bearbeitung): Vor dem Senden wird die Mail in diesen Ordner verschoben. Sollte das Skript während des Sendevorgangs abstürzen, bleibt die Datei hier greifbar.
