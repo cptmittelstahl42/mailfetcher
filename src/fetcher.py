@@ -259,41 +259,32 @@ def extract_recipients(eml_file):
     return list(recipients)
 
 def process_pending_queue():
-
     pending_dir = (
         Path(CONFIG["paths"]["base"])
         / "queue"
         / "pending"
     )
 
+    # glob("*.eml") nutzt die Wildcard *, um alle EML-Dateien zu finden
     for eml_file in pending_dir.glob("*.eml"):
+        try:
+            LOGGER.info(
+                f"Processing {eml_file.name}"
+            )
 
-    try:
+            processing_file = move_to_processing(eml_file)
+            deliver_to_exchange(processing_file)
+            move_to_delivered(processing_file)
 
-        LOGGER.*nfo(
-            f"Processing {eml*file.name}"
-        )
-
-        pro*essing_file = move_to_processing(
-*           eml_file
-        )
-
-   *    deliver_to_exchange(
-         *  processing_file
-        )
-
-     *  move_to_delivered(
-            p*ocessing_file
-        )
-
-        L*GGER.info(
-            f"Delivered*{processing_file.name}"
-        )
-*    except Exception as e:
-
-      * LOGGER.error(
-            f"Proce*sing failed: {e}"
-        )
+            LOGGER.info(
+                f"Delivered {processing_file.name}"
+            )
+        except Exception as e:
+            LOGGER.error(
+                f"Processing failed for {eml_file.name}: {e}"
+            )
+            # WICHTIG: Fehlerbehandlung / Verschieben nach failed!
+            move_to_failed(processing_file if 'processing_file' in locals() else eml_file)
 
 def deliver_to_exchange(eml_file):
 
