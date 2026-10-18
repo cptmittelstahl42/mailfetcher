@@ -6,6 +6,21 @@ Das Projekt nutzt ein **dateibasiertes Queue-System** (Warteschlange), um E-Mail
 
 ---
 
+## Status
+
+Projektstatus: Release Candidate
+
+Getestet mit:
+
+- Debian 13
+- Microsoft Exchange Server 2019
+- Strato POP3
+- Python 3.13
+
+Das Projekt befindet sich in aktivem Einsatz im Homelab-Betrieb und unterstützt Queue-Verarbeitung, Retry-Mechanismen, Admin-Benachrichtigungen und automatisierte Bereinigung von Zustellungsarchiven.
+
+---
+
 ## 💡 Grundkonzept & Funktionsweise
 
 ### Wie funktioniert die Warteschlange (Queue)?
