@@ -155,6 +155,67 @@ def download_first_message():
 
     pop.quit()
 
+def extract_recipients(eml_file):
+
+    with open(eml_file, "rb") as f:
+        msg = message_from_bytes(
+            f.read()
+        )
+
+    recipients = set()
+
+    for header in (
+        "X-Original-To",
+        "Delivered-To",
+        "Envelope-To",
+        "To",
+        "Cc"
+    ):
+
+        if header in msg:
+
+            recipients.update(
+                addr
+                for _, addr
+                in getaddresses(
+                    [msg[header]]
+                )
+            )
+
+    received_headers = msg.get_all(
+        "Received",
+        []
+    )
+
+    for received in received_headers:
+
+        matches = re.findall(
+            r'for\s+<?([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>?',
+            received,
+            re.IGNORECASE
+        )
+
+        recipients.update(matches)
+
+    return list(recipients)
+
+def test_recipient_extraction():
+
+    eml_file = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "pending"
+        / "test.eml"
+    )
+
+    recipients = extract_recipients(
+        eml_file
+    )
+
+    LOGGER.info(
+        f"Recipients found: {recipients}"
+    )
+
 
 def main():
 
@@ -169,6 +230,8 @@ def main():
     connect_pop3()
 
     download_first_message()
+
+    test_recipient_extraction()
 
 
 if __name__ == "__main__":
