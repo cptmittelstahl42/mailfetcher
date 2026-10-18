@@ -156,3 +156,12 @@ Verschiebe die .eml-Datei manuell zurück in den pending-Ordner, um eine erneute
 
 Bash
 mv /opt/mailfetcher/queue/failed/*.eml /opt/mailfetcher/queue/pending/
+
+
+## Lizenz
+
+Dieses Projekt steht unter der GNU General Public License v3.0 (GPLv3).
+
+Copyright (c) 2026 Tim Böttcher [cptmittelstahl42]
+
+Details siehe Datei LICENSE.
