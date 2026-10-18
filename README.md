@@ -75,15 +75,22 @@ Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter `/opt/mai
 
 Führe als `root` im geklonten Repository folgenden Befehl aus:
 
+```text
 Bash
 chmod +x install.sh
 ./install.sh
-Konfiguration
-Nach der Installation liegt unter /opt/mailfetcher/config.yaml deine Konfigurationsdatei. Bearbeite diese mit einem Texteditor (z. B. nano):
+```
 
+## Konfiguration
+Nach der Installation liegt unter `/opt/mailfetcher/config.yaml`  deine Konfigurationsdatei. Bearbeite diese mit einem Texteditor (z. B. nano):
+
+```text
 Bash
 nano /opt/mailfetcher/config.yaml
+```
+
 Beispielhafte config.yaml:
+```text
 YAML
 # POP3-Zugangsdaten (E-Mail-Postfach abholen)
 pop3:
@@ -113,28 +120,9 @@ options:
 # Systempfade
 paths:
   base: /opt/mailfetcher
+```
 
-# SMTP-Zugangsdaten (Interner Mailserver / Exchange)
-smtp:
-  server: ex01.ad.cooperlan.de
-  port: 25
-  default_sender: mailfetcher@cooperlan.de
-  timeout: 30
-  use_tls: false
-
-# Admin-E-Mail für Fehlermeldungen
-admin:
-  email: admin@cooperlan.de
-
-# Verhalten & Limits
-options:
-  delete_after_download: true   # Mails nach Download vom POP3-Server löschen
-  max_retries: 10               # Maximale Zustellversuche vor Abgabe nach queue/failed
-
-# Systempfade
-paths:
-  base: /opt/mailfetcher
-Dienst starten & steuern
+## Dienst starten & steuern
 Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das Python-Skript aufruft.
 
 1. Timer aktivieren und starten:
