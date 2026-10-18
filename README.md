@@ -90,8 +90,7 @@ nano /opt/mailfetcher/config.yaml
 ```
 
 Beispielhafte config.yaml:
-```text
-YAML
+```YAML
 # POP3-Zugangsdaten (E-Mail-Postfach abholen)
 pop3:
   server: pop3.strato.de
@@ -136,26 +135,22 @@ Service-Status (letzter Durchlauf): `systemctl status mailfetcher.service`
 
 3. Manuelle Ausführung (Testlauf):
 Du kannst den Mailfetcher jederzeit manuell anstoßen, ohne auf den Timer zu warten:
-```text
-Bash
+```Bash
 systemctl start mailfetcher.service
 ```
 Oder direkt über die Python-Umgebung ausführen:
-```text
-Bash
+```Bash
 /opt/mailfetcher/venv/bin/python /opt/mailfetcher/src/fetcher.py
 ```
 
 ## Monitoring & Fehlerbehebung
 Logs einsehen
 Der Mailfetcher schreibt ausführliche Informationen in seine Log-Datei:
-```text
-Bash
+```Bash
 tail -f /opt/mailfetcher/logs/fetcher.log
 ```
 Alternativ kannst du die Systemd-Logs nutzen:
-```text
-Bash
+```Bash
 journalctl -u mailfetcher.service -n 50 --no-pager
 ```
 Was tun, wenn E-Mails in queue/failed landen?
@@ -164,8 +159,7 @@ Prüfe die Log-Datei (`fetcher.log`), um den Grund für das Scheitern zu ermitte
 Korrigiere das zugrunde liegende Problem.
 
 Verschiebe die `.eml-Datei` manuell zurück in den pending-Ordner, um eine erneute Zustellung zu erzwingen:
-```text
-Bash
+```Bash
 mv /opt/mailfetcher/queue/failed/*.eml /opt/mailfetcher/queue/pending/
 ```
 
