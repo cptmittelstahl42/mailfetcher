@@ -125,10 +125,12 @@ def download_all_messages():
         for i in range(1, count + 1):
             response, lines, octets = pop.retr(i)
             raw = b"\r\n".join(lines)
-            save_to_pending(raw)
             
-            # OPTIONAL: Wenn Mails nach dem Abholen auf dem POP3-Server gelöscht werden sollen:
-            # pop.dele(i)
+            # Speicherst du die Mail erfolgreich...
+            saved_file = save_to_pending(raw)
+            
+            # ...lösche sie auf dem POP3-Server, damit sie nicht erneut heruntergeladen wird
+            pop.dele(i)
 
         pop.quit()
         LOGGER.info("Download completed successfully")
