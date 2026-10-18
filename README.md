@@ -4,8 +4,6 @@
 
 Das Projekt nutzt ein **dateibasiertes Queue-System** (Warteschlange), um E-Mails auch bei Netzwerkunterbrechungen oder Serverausfällen verlustfrei und zuverlässig zu verarbeiten.
 
----
-
 ## Status
 
 Projektstatus: Release Candidate
