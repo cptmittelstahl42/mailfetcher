@@ -112,6 +112,27 @@ options:
 # Systempfade
 paths:
   base: /opt/mailfetcher
+
+# SMTP-Zugangsdaten (Interner Mailserver / Exchange)
+smtp:
+  server: ex01.ad.cooperlan.de
+  port: 25
+  default_sender: mailfetcher@cooperlan.de
+  timeout: 30
+  use_tls: false
+
+# Admin-E-Mail für Fehlermeldungen
+admin:
+  email: admin@cooperlan.de
+
+# Verhalten & Limits
+options:
+  delete_after_download: true   # Mails nach Download vom POP3-Server löschen
+  max_retries: 10               # Maximale Zustellversuche vor Abgabe nach queue/failed
+
+# Systempfade
+paths:
+  base: /opt/mailfetcher
 Dienst starten & steuern
 Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das Python-Skript aufruft.
 
