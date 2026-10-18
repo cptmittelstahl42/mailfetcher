@@ -75,8 +75,7 @@ Das mitgelieferte Installationsskript richtet die Ordnerstruktur unter `/opt/mai
 
 Führe als `root` im geklonten Repository folgenden Befehl aus:
 
-```text
-Bash
+```Bash
 chmod +x install.sh
 ./install.sh
 ```
@@ -84,8 +83,7 @@ chmod +x install.sh
 ## Konfiguration
 Nach der Installation liegt unter `/opt/mailfetcher/config.yaml`  deine Konfigurationsdatei. Bearbeite diese mit einem Texteditor (z. B. nano):
 
-```text
-Bash
+```Bash
 nano /opt/mailfetcher/config.yaml
 ```
 
