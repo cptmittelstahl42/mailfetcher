@@ -218,6 +218,28 @@ def extract_recipients(eml_file):
 
     return list(recipients)
 
+def process_pending_queue():
+
+    pending_dir = (
+        Path(CONFIG["paths"]["base"])
+        / "queue"
+        / "pending"
+    )
+
+    for eml_file in pending_dir.glob("*.eml"):
+
+        LOGGER.info(
+            f"Processing {eml_file.name}"
+        )
+
+        recipients = extract_recipients(
+            eml_file
+        )
+
+        LOGGER.info(
+            f"Recipients: {recipients}"
+        )
+
 def deliver_to_exchange(eml_file):
 
     with open(eml_file, "rb") as f:
@@ -308,6 +330,8 @@ def main():
     connect_pop3()
 
     download_all_messages()
+
+    process_pending_queue()
 
 
 if __name__ == "__main__":
