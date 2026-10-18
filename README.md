@@ -67,20 +67,6 @@ mailfetcher/
 ├── requirements.txt          # Python-Abhängigkeiten
 └── README.md                 # Dokumentation
 
-
-Projektstruktur
-Plaintext
-mailfetcher/
-├── config/
-│   └── config.yaml.example   # Vorlage für die Konfiguration
-├── src/
-│   └── fetcher.py            # Hauptprogramm (Python)
-├── systemd/
-│   ├── mailfetcher.service   # Systemd Dienst-Definition
-│   └── mailfetcher.timer     # Systemd Timer (alle 5 Minuten)
-├── install.sh                # Automatisches Installationsskript
-├── requirements.txt          # Python-Abhängigkeiten
-└── README.md                 # Dokumentation
 ```
 
 Installation
