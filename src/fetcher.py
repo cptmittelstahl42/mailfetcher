@@ -77,6 +77,38 @@ def sha256_bytes(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def connect_pop3():
+
+    LOGGER.info(
+        f"Connecting to {CONFIG['pop3']['server']}"
+    )
+
+    pop = poplib.POP3_SSL(
+        CONFIG["pop3"]["server"],
+        CONFIG["pop3"]["port"]
+    )
+
+    pop.user(
+        CONFIG["pop3"]["username"]
+    )
+
+    pop.pass_(
+        CONFIG["pop3"]["password"]
+    )
+
+    count, size = pop.stat()
+
+    LOGGER.info(
+        f"Mailbox contains {count} messages ({size} bytes)"
+    )
+
+    pop.quit()
+
+    LOGGER.info(
+        "POP3 connection closed"
+    )
+
+
 def main():
 
     load_config()
