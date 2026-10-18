@@ -1,0 +1,8 @@
+.git
+.gitignore
+venv
+logs
+queue
+archive
+state
+config.yaml
