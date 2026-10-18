@@ -27,7 +27,16 @@ LOCK_FILE_HANDLE = None
 
 def load_config():
     global CONFIG
-    config_file = Path("/opt/mailfetcher/config.yaml")
+    base_config = Path("/opt/mailfetcher/config.yaml")
+    sub_config = Path("/opt/mailfetcher/config/config.yaml")
+
+    config_file = base_config if base_config.exists() else sub_config
+
+    if not config_file.exists():
+        raise FileNotFoundError(
+            "Configuration file not found. Please create /opt/mailfetcher/config.yaml"
+        )
+
     with open(config_file, "r") as f:
         CONFIG = yaml.safe_load(f)
 
