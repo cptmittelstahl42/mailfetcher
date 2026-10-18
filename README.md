@@ -12,6 +12,7 @@ Das Projekt nutzt ein dateibasiertes Queue-System (Warteschlange), um E-Mails au
   * Microsoft Exchange Server 2019
   * Strato POP3
   * Python 3.13
+    
 
 Das Projekt befindet sich in aktivem Einsatz im Homelab-Betrieb und unterstützt Queue-Verarbeitung, Retry-Mechanismen, Admin-Benachrichtigungen und automatisierte Bereinigung von Zustellungsarchiven.
 
@@ -124,12 +125,10 @@ Der Mailfetcher wird über einen Systemd Timer gesteuert, der alle 5 Minuten das
 
 1. Timer aktivieren und starten: `systemctl enable --now mailfetcher.timer`
 
-2. Status prüfen:
-Timer-Status: `systemctl status mailfetcher.timer`
-
-Nächste Ausführung anzeigen: `systemctl list-timers | grep mailfetcher`
-
-Service-Status (letzter Durchlauf): `systemctl status mailfetcher.service`
+### 2. Status prüfen:
+* **Timer-Status:** `systemctl status mailfetcher.timer`
+* **Nächste Ausführung:** `systemctl list-timers | grep mailfetcher`
+* **Service-Status:** `systemctl status mailfetcher.service`
 
 3. Manuelle Ausführung (Testlauf):
 Du kannst den Mailfetcher jederzeit manuell anstoßen, ohne auf den Timer zu warten:
@@ -142,21 +141,23 @@ Oder direkt über die Python-Umgebung ausführen:
 ```
 
 ## Monitoring & Fehlerbehebung
-Logs einsehen
+### Logs einsehen
+
 Der Mailfetcher schreibt ausführliche Informationen in seine Log-Datei:
-```Bash
+
+```bash
 tail -f /opt/mailfetcher/logs/fetcher.log
 ```
 Alternativ kannst du die Systemd-Logs nutzen:
 ```Bash
 journalctl -u mailfetcher.service -n 50 --no-pager
 ```
-Was tun, wenn E-Mails in queue/failed landen?
-Prüfe die Log-Datei (`fetcher.log`), um den Grund für das Scheitern zu ermitteln (z. B. fehlerhafte Empfängeradresse oder Exchange nicht erreichbar).
+Was tun, wenn E-Mails in `queue/failed` landen?
+1. Prüfe die Log-Datei (`fetcher.log`), um den Grund für das Scheitern zu ermitteln (z. B. fehlerhafte Empfängeradresse oder Exchange nicht erreichbar).
 
-Korrigiere das zugrunde liegende Problem.
+2. Korrigiere das zugrunde liegende Problem.
 
-Verschiebe die `.eml-Datei` manuell zurück in den pending-Ordner, um eine erneute Zustellung zu erzwingen:
+3. Verschiebe die `.eml`-Datei manuell zurück in den `pending`-Ordner, um eine erneute Zustellung zu erzwingen:
 ```Bash
 mv /opt/mailfetcher/queue/failed/*.eml /opt/mailfetcher/queue/pending/
 ```
