@@ -1,15 +1,19 @@
 pop3:
   server: pop3.strato.de
   port: 995
-  username: info@cooperlan.de
-  password: **********
+  username: mail@example.com
+  password: "YOUR_POP3_PASSWORD_HERE"
+  timeout: 30
 
 smtp:
-  server: ex01.ad.cooperlan.de
+  server: ex01.ad.example.com
   port: 25
+  default_sender: mailfetcher@example.com
+  timeout: 30
+  use_tls: false
 
 admin:
-  email: tboettcher2@freenet.de
+  email: admin@example.com
 
 options:
   delete_after_download: true
